@@ -183,6 +183,48 @@ export default function Drones() {
     }
   }
 
+  const handleTakeoff = async (droneId: string) => {
+    try {
+      await dronesApi.sendCommand(droneId, {
+        command: 'takeoff',
+        parameters: { altitude: 50.0 }
+      })
+      alert('Takeoff command sent successfully!')
+      await loadDrones()
+    } catch (error) {
+      console.error('Failed to send takeoff command:', error)
+      alert('Failed to send takeoff command')
+    }
+  }
+
+  const handleRTH = async (droneId: string) => {
+    try {
+      await dronesApi.sendCommand(droneId, {
+        command: 'rth',
+        parameters: { reason: 'Manual' }
+      })
+      alert('Return to Home command sent successfully!')
+      await loadDrones()
+    } catch (error) {
+      console.error('Failed to send RTH command:', error)
+      alert('Failed to send RTH command')
+    }
+  }
+
+  const handleLand = async (droneId: string) => {
+    try {
+      await dronesApi.sendCommand(droneId, {
+        command: 'land',
+        parameters: {}
+      })
+      alert('Land command sent successfully!')
+      await loadDrones()
+    } catch (error) {
+      console.error('Failed to send land command:', error)
+      alert('Failed to send land command')
+    }
+  }
+
   // Calculate map center based on drones
   const mapCenter: [number, number] = drones.length > 0
     ? [drones[0].position.latitude, drones[0].position.longitude]
@@ -471,6 +513,42 @@ export default function Drones() {
                   </>
                 )}
               </List>
+
+              <Divider sx={{ my: 2 }} />
+
+              {/* Drone Control Buttons */}
+              <Typography variant="h6" sx={{ mb: 2 }}>
+                Drone Controls
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Button
+                  variant="contained"
+                  color="success"
+                  fullWidth
+                  onClick={() => handleTakeoff(selectedDrone.id)}
+                  disabled={selectedDrone.status !== 'idle' && selectedDrone.status !== 'landed'}
+                >
+                  Takeoff
+                </Button>
+                <Button
+                  variant="contained"
+                  color="warning"
+                  fullWidth
+                  onClick={() => handleRTH(selectedDrone.id)}
+                  disabled={selectedDrone.status !== 'in_flight' && selectedDrone.status !== 'hovering'}
+                >
+                  Return to Home (RTH)
+                </Button>
+                <Button
+                  variant="contained"
+                  color="error"
+                  fullWidth
+                  onClick={() => handleLand(selectedDrone.id)}
+                  disabled={selectedDrone.status !== 'in_flight' && selectedDrone.status !== 'hovering'}
+                >
+                  Land
+                </Button>
+              </Box>
 
               <Box sx={{ mt: 2 }}>
                 <Button
