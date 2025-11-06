@@ -229,6 +229,9 @@ class DroneSimulator:
             self.drone.status = DroneStatus.HOVERING
             return
 
+        # Check geo-fence violations
+        await self._check_geofence()
+
         # Get current waypoint
         if self.current_waypoint_index >= len(self.current_mission.waypoints):
             # Mission complete
@@ -482,3 +485,85 @@ class DroneSimulator:
 
         bearing = math.degrees(math.atan2(y, x))
         return (bearing + 360) % 360
+
+    async def _check_geofence(self):
+        """Check if drone is violating any geo-fence zones"""
+        if not self.current_mission or not self.current_mission.geofence_zones:
+            return
+
+        current_pos = self.physics_state.position
+        current_alt = current_pos[2]
+
+        for zone in self.current_mission.geofence_zones:
+            # Check altitude constraints
+            if zone.altitude_min is not None and current_alt < zone.altitude_min:
+                await self._handle_geofence_violation(zone, "below minimum altitude")
+                continue
+            if zone.altitude_max is not None and current_alt > zone.altitude_max:
+                await self._handle_geofence_violation(zone, "above maximum altitude")
+                continue
+
+            # Check zone type
+            if zone.type == "circle":
+                # Circle geofence - check if outside radius
+                if len(zone.coordinates) > 0:
+                    center = zone.coordinates[0]
+                    distance = self._calculate_distance(
+                        current_pos[0], current_pos[1],
+                        center.latitude, center.longitude
+                    )
+                    # Use altitude as radius for circle zones
+                    radius = center.altitude if hasattr(center, 'altitude') else 100.0
+                    if distance > radius:
+                        await self._handle_geofence_violation(zone, f"outside circle boundary (distance: {distance:.1f}m)")
+
+            elif zone.type == "polygon":
+                # Polygon geofence - check if outside boundary
+                if self._is_outside_polygon(current_pos[0], current_pos[1], zone.coordinates):
+                    await self._handle_geofence_violation(zone, "outside polygon boundary")
+
+    def _is_outside_polygon(self, lat: float, lon: float, polygon_coords) -> bool:
+        """Check if point is outside polygon using ray casting algorithm"""
+        if len(polygon_coords) < 3:
+            return False
+
+        inside = False
+        n = len(polygon_coords)
+
+        for i in range(n):
+            j = (i + 1) % n
+            xi, yi = polygon_coords[i].latitude, polygon_coords[i].longitude
+            xj, yj = polygon_coords[j].latitude, polygon_coords[j].longitude
+
+            if ((yi > lon) != (yj > lon)) and (lat < (xj - xi) * (lon - yi) / (yj - yi) + xi):
+                inside = not inside
+
+        return not inside
+
+    async def _handle_geofence_violation(self, zone, reason: str):
+        """Handle geo-fence violation"""
+        from models import Alert, EventSeverity
+
+        # Store last violation time to avoid spam
+        if not hasattr(self, 'last_geofence_alert'):
+            self.last_geofence_alert = {}
+
+        zone_key = f"{zone.type}_{reason}"
+        current_time = self.sim_time
+
+        # Only alert once every 5 seconds for the same violation
+        if zone_key in self.last_geofence_alert:
+            if current_time - self.last_geofence_alert[zone_key] < 5.0:
+                return
+
+        self.last_geofence_alert[zone_key] = current_time
+
+        # Log the violation - we'll need to pass this to fleet manager
+        # For now, just take action based on zone configuration
+        if zone.action == "rth":
+            await self.initiate_rth(f"Geo-fence violation: {reason}")
+        elif zone.action == "land":
+            await self.land()
+        elif zone.action == "warn":
+            # Just log warning - fleet manager will handle alert creation
+            pass

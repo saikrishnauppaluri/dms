@@ -24,7 +24,7 @@ import {
   Alert,
   Snackbar
 } from '@mui/material'
-import { MapContainer, TileLayer, Marker, Polyline, Circle } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Polyline, Circle, Polygon } from 'react-leaflet'
 import L from 'leaflet'
 import { missionsApi, dronesApi } from '../services/api'
 import 'leaflet/dist/leaflet.css'
@@ -97,7 +97,7 @@ export default function Missions() {
     if (!selectedDroneId || !selectedMission) return
 
     try {
-      await missionsApi.assign(selectedMission.id, { drone_id: selectedDroneId })
+      await missionsApi.assign(selectedMission.id, { drone_ids: [selectedDroneId], start_immediately: false })
       await missionsApi.command(selectedMission.id, { command: 'start' })
 
       setSnackbar({
@@ -270,6 +270,50 @@ export default function Missions() {
                         }}
                       />
                     ))}
+
+                    {/* Draw geo-fence zones if any */}
+                    {selectedMission.geofence_zones && selectedMission.geofence_zones.map((zone: any, idx: number) => {
+                      const zoneColor = zone.action === 'rth' ? '#f44336' : zone.action === 'land' ? '#ff9800' : '#ffc107'
+
+                      if (zone.type === 'circle') {
+                        const center = zone.coordinates[0]
+                        const radius = center.altitude || 100
+
+                        return (
+                          <Circle
+                            key={`geofence-circle-${idx}`}
+                            center={[center.latitude, center.longitude]}
+                            radius={radius}
+                            pathOptions={{
+                              color: zoneColor,
+                              fillColor: zoneColor,
+                              fillOpacity: 0.15,
+                              weight: 2,
+                              dashArray: '10, 5',
+                            }}
+                          />
+                        )
+                      } else if (zone.type === 'polygon') {
+                        const polygonPositions = zone.coordinates.map((coord: any) =>
+                          [coord.latitude, coord.longitude] as [number, number]
+                        )
+
+                        return (
+                          <Polygon
+                            key={`geofence-polygon-${idx}`}
+                            positions={polygonPositions}
+                            pathOptions={{
+                              color: zoneColor,
+                              fillColor: zoneColor,
+                              fillOpacity: 0.15,
+                              weight: 2,
+                              dashArray: '10, 5',
+                            }}
+                          />
+                        )
+                      }
+                      return null
+                    })}
                   </MapContainer>
                 </Box>
               )}

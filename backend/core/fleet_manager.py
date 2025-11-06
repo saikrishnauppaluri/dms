@@ -152,6 +152,22 @@ class FleetManager:
             except asyncio.CancelledError:
                 pass
 
+        # Set all drones to landed status when simulation stops
+        for drone_id, drone in self.drones.items():
+            if drone.status not in [DroneStatus.OFFLINE, DroneStatus.LANDED]:
+                drone.status = DroneStatus.LANDED
+                drone.mission_id = None
+                simulator = self.simulators[drone_id]
+                simulator.is_armed = False
+                simulator.current_mission = None
+                simulator.current_waypoint_index = 0
+
+        # Update all missions to pending status
+        for mission in self.missions.values():
+            if mission.status == MissionStatus.ACTIVE:
+                mission.status = MissionStatus.PENDING
+                mission.assigned_drone_ids = []
+
         await self._log_event(
             event_type="fleet_stopped",
             severity=EventSeverity.INFO,

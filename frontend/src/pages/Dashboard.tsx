@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Grid, Paper, Typography, Box } from '@mui/material'
-import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, Polygon } from 'react-leaflet'
 import L from 'leaflet'
 import { telemetryApi, fleetApi, dronesApi, missionsApi } from '../services/api'
 import wsService from '../services/websocket'
@@ -246,52 +246,221 @@ export default function Dashboard() {
               [wp.position.latitude, wp.position.longitude] as [number, number]
             )
 
+            // Get current waypoint from telemetry
+            const currentTel = telemetry[drone.id]
+            const currentWaypointIndex = currentTel?.current_waypoint || 0
+
             return (
               <div key={`mission-${drone.id}`}>
-                {/* Draw flight path */}
+                {/* Draw planned flight path */}
                 <Polyline
                   positions={waypointPositions}
                   color="#2196f3"
                   weight={2}
-                  opacity={0.6}
+                  opacity={0.4}
                   dashArray="5, 10"
                 />
 
+                {/* Draw completed path (from drone to waypoints already visited) */}
+                {currentWaypointIndex > 0 && (
+                  <Polyline
+                    positions={[
+                      [drone.position.latitude, drone.position.longitude],
+                      ...waypointPositions.slice(0, currentWaypointIndex)
+                    ]}
+                    color="#4caf50"
+                    weight={3}
+                    opacity={0.8}
+                  />
+                )}
+
+                {/* Draw line to current target waypoint */}
+                {currentWaypointIndex < mission.waypoints.length && (
+                  <Polyline
+                    positions={[
+                      [drone.position.latitude, drone.position.longitude],
+                      waypointPositions[currentWaypointIndex]
+                    ]}
+                    color="#ff9800"
+                    weight={2}
+                    opacity={0.8}
+                    dashArray="10, 5"
+                  />
+                )}
+
                 {/* Draw waypoints */}
-                {mission.waypoints.map((wp: any, idx: number) => (
-                  <Marker
-                    key={`wp-${drone.id}-${idx}`}
-                    position={[wp.position.latitude, wp.position.longitude]}
-                    icon={waypointIcon}
-                  >
-                    <Popup>
-                      <div>
-                        <strong>Waypoint {idx + 1}</strong>
-                        <br />
-                        Mission: {mission.name}
-                        <br />
-                        Altitude: {wp.position.altitude} m
-                        <br />
-                        Speed: {wp.speed || 'default'} m/s
-                      </div>
-                    </Popup>
-                  </Marker>
-                ))}
+                {mission.waypoints.map((wp: any, idx: number) => {
+                  const isCompleted = idx < currentWaypointIndex
+                  const isCurrent = idx === currentWaypointIndex
+                  const isPending = idx > currentWaypointIndex
+
+                  const waypointColor = isCompleted ? '#4caf50' : isCurrent ? '#ff9800' : '#2196f3'
+
+                  const customWaypointIcon = L.divIcon({
+                    html: `
+                      <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="12" cy="12" r="10" fill="${waypointColor}" opacity="0.3" stroke="${waypointColor}" stroke-width="2"/>
+                        <circle cx="12" cy="12" r="4" fill="${waypointColor}"/>
+                        ${isCurrent ? '<circle cx="12" cy="12" r="8" fill="none" stroke="' + waypointColor + '" stroke-width="2" opacity="0.6"><animate attributeName="r" from="8" to="12" dur="1s" repeatCount="indefinite"/><animate attributeName="opacity" from="0.6" to="0" dur="1s" repeatCount="indefinite"/></circle>' : ''}
+                      </svg>
+                    `,
+                    className: 'waypoint-icon',
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12],
+                  })
+
+                  return (
+                    <Marker
+                      key={`wp-${drone.id}-${idx}`}
+                      position={[wp.position.latitude, wp.position.longitude]}
+                      icon={customWaypointIcon}
+                    >
+                      <Popup>
+                        <div>
+                          <strong>Waypoint {idx + 1}</strong>
+                          {isCompleted && <span style={{ color: '#4caf50', marginLeft: '8px' }}>✓ Completed</span>}
+                          {isCurrent && <span style={{ color: '#ff9800', marginLeft: '8px' }}>→ Current</span>}
+                          {isPending && <span style={{ color: '#2196f3', marginLeft: '8px' }}>○ Pending</span>}
+                          <br />
+                          Mission: {mission.name}
+                          <br />
+                          Altitude: {wp.position.altitude} m
+                          <br />
+                          Speed: {wp.speed || 'default'} m/s
+                          {currentTel?.distance_to_waypoint != null && isCurrent && (
+                            <>
+                              <br />
+                              Distance: {currentTel.distance_to_waypoint.toFixed(1)} m
+                            </>
+                          )}
+                        </div>
+                      </Popup>
+                    </Marker>
+                  )
+                })}
 
                 {/* Draw altitude circles around waypoints */}
-                {mission.waypoints.map((wp: any, idx: number) => (
-                  <Circle
-                    key={`circle-${drone.id}-${idx}`}
-                    center={[wp.position.latitude, wp.position.longitude]}
-                    radius={wp.position.altitude / 2}
-                    pathOptions={{
-                      color: '#2196f3',
-                      fillColor: '#2196f3',
-                      fillOpacity: 0.05,
-                      weight: 1,
-                    }}
-                  />
-                ))}
+                {mission.waypoints.map((wp: any, idx: number) => {
+                  const isCurrent = idx === currentWaypointIndex
+                  return (
+                    <Circle
+                      key={`circle-${drone.id}-${idx}`}
+                      center={[wp.position.latitude, wp.position.longitude]}
+                      radius={wp.position.altitude / 2}
+                      pathOptions={{
+                        color: isCurrent ? '#ff9800' : '#2196f3',
+                        fillColor: isCurrent ? '#ff9800' : '#2196f3',
+                        fillOpacity: isCurrent ? 0.1 : 0.05,
+                        weight: isCurrent ? 2 : 1,
+                      }}
+                    />
+                  )
+                })}
+              </div>
+            )
+          })}
+
+          {/* Draw geo-fence zones for active missions */}
+          {dronePositions.map((drone) => {
+            if (!drone.mission_id) return null
+
+            const mission = missions[drone.mission_id]
+            if (!mission || !mission.geofence_zones || mission.geofence_zones.length === 0) return null
+
+            return (
+              <div key={`geofence-${drone.id}`}>
+                {mission.geofence_zones.map((zone: any, idx: number) => {
+                  const zoneColor = zone.action === 'rth' ? '#f44336' : zone.action === 'land' ? '#ff9800' : '#ffc107'
+
+                  if (zone.type === 'circle') {
+                    // Draw circle geo-fence
+                    const center = zone.coordinates[0]
+                    const radius = center.altitude || 100
+
+                    return (
+                      <Circle
+                        key={`geofence-circle-${drone.id}-${idx}`}
+                        center={[center.latitude, center.longitude]}
+                        radius={radius}
+                        pathOptions={{
+                          color: zoneColor,
+                          fillColor: zoneColor,
+                          fillOpacity: 0.1,
+                          weight: 2,
+                          dashArray: '10, 5',
+                        }}
+                      >
+                        <Popup>
+                          <div>
+                            <strong>Geo-fence Zone</strong>
+                            <br />
+                            Type: Circle
+                            <br />
+                            Radius: {radius.toFixed(0)} m
+                            <br />
+                            Action: {zone.action}
+                            {zone.altitude_min != null && (
+                              <>
+                                <br />
+                                Min Altitude: {zone.altitude_min} m
+                              </>
+                            )}
+                            {zone.altitude_max != null && (
+                              <>
+                                <br />
+                                Max Altitude: {zone.altitude_max} m
+                              </>
+                            )}
+                          </div>
+                        </Popup>
+                      </Circle>
+                    )
+                  } else if (zone.type === 'polygon') {
+                    // Draw polygon geo-fence
+                    const polygonPositions = zone.coordinates.map((coord: any) =>
+                      [coord.latitude, coord.longitude] as [number, number]
+                    )
+
+                    return (
+                      <Polygon
+                        key={`geofence-polygon-${drone.id}-${idx}`}
+                        positions={polygonPositions}
+                        pathOptions={{
+                          color: zoneColor,
+                          fillColor: zoneColor,
+                          fillOpacity: 0.1,
+                          weight: 2,
+                          dashArray: '10, 5',
+                        }}
+                      >
+                        <Popup>
+                          <div>
+                            <strong>Geo-fence Zone</strong>
+                            <br />
+                            Type: Polygon
+                            <br />
+                            Vertices: {zone.coordinates.length}
+                            <br />
+                            Action: {zone.action}
+                            {zone.altitude_min != null && (
+                              <>
+                                <br />
+                                Min Altitude: {zone.altitude_min} m
+                              </>
+                            )}
+                            {zone.altitude_max != null && (
+                              <>
+                                <br />
+                                Max Altitude: {zone.altitude_max} m
+                              </>
+                            )}
+                          </div>
+                        </Popup>
+                      </Polygon>
+                    )
+                  }
+                  return null
+                })}
               </div>
             )
           })}
