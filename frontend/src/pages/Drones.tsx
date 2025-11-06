@@ -120,7 +120,15 @@ export default function Drones() {
   const loadDrones = async () => {
     try {
       const response = await dronesApi.list()
-      setDrones(response.data.drones || [])
+      const dronesList = response.data.drones || []
+      setDrones(dronesList)
+
+      // Auto-load missions for drones that have active missions
+      dronesList.forEach((drone: any) => {
+        if (drone.mission_id) {
+          loadMission(drone.mission_id)
+        }
+      })
     } catch (error) {
       console.error('Failed to load drones:', error)
     }
