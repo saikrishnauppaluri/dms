@@ -259,9 +259,10 @@ curl http://localhost:8000/health
 ```
 
 ### No drones on map
-1. Make sure simulation is started
-2. Load a scenario first
+1. Make sure simulation is started (green status on Scenarios page)
+2. Load a scenario first (go to Scenarios page and click "Load & Start")
 3. Check fleet status: `curl http://localhost:8000/api/v1/fleet/status`
+4. Navigate to the Drones page (not Dashboard) to see the full map with waypoints
 
 ### WebSocket not connecting
 1. Verify backend is running
@@ -269,6 +270,36 @@ curl http://localhost:8000/health
 3. Try: `wscat -c ws://localhost:8000/ws`
 
 ---
+
+## Map Visualization Features
+
+The **Drones page** provides rich visualization:
+
+### Drone Icons
+- **Color-coded by status:**
+  - 🟢 Green: In flight
+  - 🔵 Cyan: Hovering
+  - 🟠 Orange: Taking off, Landing, or Armed
+  - 🔴 Red: Emergency
+  - ⚫ Gray: Idle or Landed
+- **Rotating icons** that show drone heading/direction
+- **Real-time position updates** every 2 seconds
+
+### Waypoint Markers
+- **Blue circle markers** at each waypoint location
+- **Dashed blue lines** connecting waypoints to show flight path
+- **Altitude circles** showing relative altitude at each waypoint
+- **Click markers** to see waypoint details (altitude, speed, etc.)
+
+### Interactive Features
+- **Click any drone** to open a detail panel with:
+  - Name, model, and specifications
+  - Current status and battery level
+  - Real-time position and altitude
+  - Current speed
+  - Mission progress (current waypoint out of total)
+- **Zoom and pan** the map to follow drones
+- **Live updates** via WebSocket for smooth animation
 
 ## Next Steps
 
@@ -278,11 +309,13 @@ curl http://localhost:8000/health
 
 2. **Try Different Scenarios**
    - Load each pre-built scenario
-   - Observe different behaviors
+   - Observe different behaviors and flight patterns
+   - Watch drones navigate waypoints in real-time
 
 3. **Create Custom Missions**
    - Design your own waypoint patterns
    - Test different parameters
+   - Visualize complex flight paths
 
 4. **Integrate with ViSNET**
    - Configure ViSNET API credentials

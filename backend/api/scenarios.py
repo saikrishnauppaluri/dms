@@ -22,7 +22,8 @@ async def list_scenarios():
             "name": scenario["name"],
             "description": scenario["description"],
             "num_drones": len(scenario.get("drones", [])),
-            "expected_duration": scenario.get("expected_duration", 0)
+            "expected_duration": scenario.get("expected_duration", 0),
+            "ai_model": scenario.get("ai_model")
         })
 
     return {"scenarios": summary}
@@ -69,14 +70,14 @@ async def load_scenario(scenario_id: str):
     if "mission" in scenario:
         mission = scenario["mission"]
         await fleet.add_mission(mission)
-        # Assign to all drones
-        await fleet.assign_mission(mission.id, drone_ids, start_immediately=False)
+        # Assign to all drones - will start when fleet starts
+        await fleet.assign_mission(mission.id, drone_ids, start_immediately=True)
 
     elif "missions" in scenario:
         for i, mission in enumerate(scenario["missions"]):
             await fleet.add_mission(mission)
             if i < len(drone_ids):
-                await fleet.assign_mission(mission.id, [drone_ids[i]], start_immediately=False)
+                await fleet.assign_mission(mission.id, [drone_ids[i]], start_immediately=True)
 
     # Set environment if specified
     if "environment" in scenario:
@@ -87,8 +88,8 @@ async def load_scenario(scenario_id: str):
             env_data.get("gust_speed", 0.0)
         )
 
-    # Start fleet
-    await fleet.start()
+    # Don't auto-start fleet - let frontend control start/stop
+    # await fleet.start()
 
     return {
         "status": "loaded",
