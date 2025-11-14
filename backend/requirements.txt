@@ -13,7 +13,6 @@ python-socketio==5.11.0
 sqlalchemy==2.0.25
 alembic==1.13.1
 psycopg2-binary==2.9.9
-databases==0.8.0
 
 # Async & Utilities
 httpx==0.26.0

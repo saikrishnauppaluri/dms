@@ -112,14 +112,12 @@ class MissionUpdate(BaseModel):
 
 class MissionAssignment(BaseModel):
     """Assign mission to drones"""
-    mission_id: UUID
     drone_ids: List[UUID]
     start_immediately: bool = False
 
 
 class MissionCommand(BaseModel):
     """Mission control command"""
-    mission_id: UUID
     command: str = Field(..., description="Command: start, pause, resume, abort, rth")
     parameters: Dict[str, Any] = Field(default_factory=dict)
 
